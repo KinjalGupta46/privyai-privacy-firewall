@@ -134,24 +134,21 @@ async def chat(request: ChatRequest) -> ChatResponse:
     )
 
 
+
 def _persist_scan(
     request_id: str,
     risk: risk_scoring.RiskResult,
     output_action: str,
     input_action: str | None = None,
 ) -> None:
-    """
-    Persist safe scan metadata to the database.
-
-    Only entity types, counts, scores and actions are stored.
-    The original prompt, redacted text and LLM response are never stored.
-
-    If the database is unavailable, log a warning and continue because
-    scan history is non-critical for the privacy guarantee.
-    """
+    """Save scan metadata, detected entity types, and audit events."""
     try:
         from app.db.session import get_db_session
-        from app.db.models.privacy_scan import PrivacyScanModel
+        from app.db.models import (
+            PrivacyScanModel,
+            DetectedEntityModel,
+            AuditLogModel,
+        )
 
         with get_db_session() as session:
             scan = PrivacyScanModel(
@@ -163,9 +160,35 @@ def _persist_scan(
                 output_action=output_action,
             )
             session.add(scan)
+            session.flush()
+
+            counts = risk.entity_counts or {}
+
+            for entity_type, count in counts.items():
+                session.add(
+                    DetectedEntityModel(
+                        scan_id=scan.id,
+                        entity_type=entity_type,
+                        entity_count=count,
+                        is_masked=(input_action or risk.action) == REDACT,
+                    )
+                )
+
+            session.add(
+                AuditLogModel(
+                    scan_id=scan.id,
+                    event_type=(
+                        "PII_DETECTED"
+                        if risk.detected_entities
+                        else "SCAN_COMPLETED"
+                    ),
+                    status="success",
+                )
+            )
+
             session.commit()
+
     except Exception as exc:
-        # Database failure must not expose prompt content or block the response.
         logger.warning(
             "Could not persist scan metadata: %s",
             type(exc).__name__,
