@@ -143,15 +143,16 @@ def test_redact_email_in_text():
     from app.services.pii_detector import detect
     from app.services.redaction import redact
 
-    original = "Please email synth@testonly.invalid for help."
+    original = "Please email alice@example.com for help."
     detection = detect(original)
 
-    if "EMAIL_ADDRESS" in detection.detected_entities:
-        result = redact(original, detection)
-        assert "synth@testonly.invalid" not in result.redacted_text
-        assert "<EMAIL_ADDRESS>" in result.redacted_text
-    else:
-        pytest.skip("Email not detected — model may have low confidence on this example")
+    # Detection must succeed; do not skip if the email is missed.
+    assert "EMAIL_ADDRESS" in detection.detected_entities
+
+    result = redact(original, detection)
+
+    assert "alice@example.com" not in result.redacted_text
+    assert "<EMAIL_ADDRESS>" in result.redacted_text
 
 
 @presidio_required
