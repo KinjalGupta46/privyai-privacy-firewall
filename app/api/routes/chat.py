@@ -9,14 +9,15 @@ Pipeline (in order):
   3. Score risk (soft-max heuristic).
   4. Apply privacy policy: ALLOW / REDACT / BLOCK.
   5. If BLOCK → return error immediately, never call the LLM.
-  6. If REDACT → redact the prompt.
+  6. Redact every detected sensitive entity before calling the LLM.
   7. Call the LLM with the sanitised prompt only.
   8. Scan the LLM's response for sensitive content.
   9. Apply output policy (ALLOW / REDACT / BLOCK).
  10. Persist safe scan metadata to the database (if configured).
  11. Return the safe response and privacy metadata.
 
-Privacy guarantee: The original unredacted prompt is NEVER sent to the LLM.
+Privacy guarantee: Detected sensitive content is redacted before the
+original prompt is sent to the LLM. Detection has inherent limitations.
 """
 
 from __future__ import annotations
@@ -59,61 +60,71 @@ async def chat(request: ChatRequest) -> ChatResponse:
     """
     request_id = generate_request_id()
 
-    # ── Step 1: Input already validated by Pydantic ──────────────────
+    # Step 1: Input is validated by Pydantic.
 
-    # ── Step 2 & 3: Detect + score ───────────────────────────────────
+    # Steps 2 and 3: Detect sensitive entities and score risk.
     detection = pii_detector.detect(request.message)
     risk = risk_scoring.score(detection)
 
-    # ── Step 4 & 5: Policy decision ──────────────────────────────────
+    # Steps 4 and 5: Block high-risk input immediately.
     if risk.action == BLOCK:
-        # NEVER call the LLM. Log only safe metadata — no prompt content.
         logger.warning(
             "Request BLOCKED | request_id=%s | score=%.2f | entities=%s",
-            request_id, risk.risk_score, risk.detected_entities,
+            request_id,
+            risk.risk_score,
+            risk.detected_entities,
         )
         _persist_scan(
             request_id=request_id,
             risk=risk,
             output_action="N/A",
+            input_action=BLOCK,
         )
         raise RequestBlockedError(
             f"Request blocked by privacy policy. "
             f"Risk score: {risk.risk_score:.2f}. "
-            f"Detected categories: {', '.join(risk.detected_entities) or 'N/A'}."
+            f"Detected categories: "
+            f"{', '.join(risk.detected_entities) or 'N/A'}."
         )
 
-    # ── Step 6: Redact if needed ─────────────────────────────────────
-    if risk.action == REDACT:
+    # Step 6: Redact all detected sensitive content before sending it
+    # to the LLM, even if the risk score would otherwise allow it.
+    if detection.has_sensitive_content:
         redaction_result = redaction.redact(request.message, detection)
         prompt_to_send = redaction_result.redacted_text
+        effective_action = REDACT
     else:
-        # ALLOW — no sensitive content detected
         prompt_to_send = request.message
+        effective_action = risk.action
 
-    # ── Step 7: Call LLM (sanitised prompt only) ─────────────────────
+    # Step 7: Call the LLM with the sanitised prompt only.
     llm_response = await llm_service.call_llm(prompt_to_send)
 
-    # ── Step 8 & 9: Output scanning ──────────────────────────────────
+    # Steps 8 and 9: Scan and apply the output privacy policy.
     output_scan = output_scanner.scan_output(llm_response.text)
     safe_response_text = output_scan.safe_text
 
-    # ── Step 10: Persist audit metadata ──────────────────────────────
+    # Step 10: Persist metadata only, never raw prompt or response text.
     _persist_scan(
         request_id=request_id,
         risk=risk,
         output_action=output_scan.action,
+        input_action=effective_action,
     )
 
-    # ── Step 11: Return safe response ────────────────────────────────
     logger.info(
-        "Request processed | request_id=%s | action=%s | score=%.2f | output_action=%s",
-        request_id, risk.action, risk.risk_score, output_scan.action,
+        "Request processed | request_id=%s | action=%s | score=%.2f | "
+        "output_action=%s",
+        request_id,
+        effective_action,
+        risk.risk_score,
+        output_scan.action,
     )
 
+    # Step 11: Return the safe response and privacy metadata.
     return ChatResponse(
         response=safe_response_text,
-        action=risk.action,
+        action=effective_action,
         detected_entities=risk.detected_entities,
         entity_counts=risk.entity_counts,
         risk_score=risk.risk_score,
@@ -127,15 +138,16 @@ def _persist_scan(
     request_id: str,
     risk: risk_scoring.RiskResult,
     output_action: str,
+    input_action: str | None = None,
 ) -> None:
     """
     Persist safe scan metadata to the database.
 
     Only entity types, counts, scores and actions are stored.
-    The original prompt, redacted text and LLM response are NEVER stored.
+    The original prompt, redacted text and LLM response are never stored.
 
-    If the database is unavailable, this silently logs a warning and
-    continues — scan history is non-critical for the privacy guarantee.
+    If the database is unavailable, log a warning and continue because
+    scan history is non-critical for the privacy guarantee.
     """
     try:
         from app.db.session import get_db_session
@@ -146,12 +158,15 @@ def _persist_scan(
                 request_id=request_id,
                 detected_entity_types=risk.detected_entities,
                 entity_counts=risk.entity_counts,
-                action_taken=risk.action,
+                action_taken=input_action or risk.action,
                 risk_score=risk.risk_score,
                 output_action=output_action,
             )
             session.add(scan)
             session.commit()
     except Exception as exc:
-        # Non-fatal: DB unavailable should not block the privacy response.
-        logger.warning("Could not persist scan metadata: %s", type(exc).__name__)
+        # Database failure must not expose prompt content or block the response.
+        logger.warning(
+            "Could not persist scan metadata: %s",
+            type(exc).__name__,
+        )

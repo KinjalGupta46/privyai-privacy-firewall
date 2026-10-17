@@ -1,3 +1,4 @@
+
 """
 app/services/output_scanner.py
 
@@ -11,8 +12,8 @@ Why output scanning matters:
   - Some prompts could trick the model into reproducing redacted content.
   - We apply the same privacy pipeline to the output as to the input.
 
-This is a best-effort check. It does not guarantee the output is
-completely free of sensitive information — detection has inherent limits.
+This is a best-effort check. It does not guarantee that the response is
+completely free of sensitive information because detection has limitations.
 """
 
 from __future__ import annotations
@@ -27,47 +28,26 @@ from app.services.risk_scoring import ALLOW, BLOCK, REDACT, RiskResult, score
 @dataclass
 class OutputScanResult:
     """Result of scanning the LLM's response."""
-    original_text: str          # Never returned to frontend
-    safe_text: str              # Redacted version (returned to frontend)
-    action: str                 # ALLOW | REDACT | BLOCK
+
+    original_text: str  # Must never be returned to the frontend
+    safe_text: str
+    action: str  # ALLOW | REDACT | BLOCK
     risk_result: RiskResult
     redaction_result: RedactionResult | None = None
 
 
 def scan_output(llm_response_text: str) -> OutputScanResult:
     """
-    Scan the LLM's response text for sensitive content and apply policy.
+    Scan the LLM response and apply the output privacy policy.
 
-    Args:
-        llm_response_text: The raw text returned by the LLM provider.
-
-    Returns:
-        OutputScanResult with the safe version of the text and action taken.
-        The original_text field is for internal audit only and must not be
-        sent to the frontend.
+    The original response is retained in this internal result for processing,
+    but callers must return only safe_text to the frontend.
     """
     detection: DetectionResult = detect(llm_response_text)
     risk: RiskResult = score(detection)
 
-    if risk.action == ALLOW:
-        return OutputScanResult(
-            original_text=llm_response_text,
-            safe_text=llm_response_text,
-            action=ALLOW,
-            risk_result=risk,
-        )
-
-    elif risk.action == REDACT:
-        redaction: RedactionResult = redact(llm_response_text, detection)
-        return OutputScanResult(
-            original_text=llm_response_text,
-            safe_text=redaction.redacted_text,
-            action=REDACT,
-            risk_result=risk,
-            redaction_result=redaction,
-        )
-
-    else:  # BLOCK
+    # Block high-risk output before returning any of its content.
+    if risk.action == BLOCK:
         return OutputScanResult(
             original_text=llm_response_text,
             safe_text=(
@@ -77,3 +57,26 @@ def scan_output(llm_response_text: str) -> OutputScanResult:
             action=BLOCK,
             risk_result=risk,
         )
+
+    # Return unchanged only if no sensitive entities were detected.
+    if not detection.has_sensitive_content:
+        return OutputScanResult(
+            original_text=llm_response_text,
+            safe_text=llm_response_text,
+            action=ALLOW,
+            risk_result=risk,
+        )
+
+    # Redact detected entities even if the risk score would otherwise ALLOW.
+    redaction_result: RedactionResult = redact(
+        llm_response_text,
+        detection,
+    )
+
+    return OutputScanResult(
+        original_text=llm_response_text,
+        safe_text=redaction_result.redacted_text,
+        action=REDACT,
+        risk_result=risk,
+        redaction_result=redaction_result,
+    )
