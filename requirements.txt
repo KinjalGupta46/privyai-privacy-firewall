@@ -16,8 +16,8 @@ pydantic-settings==2.6.1
 
 # ── Database ───────────────────────────────────────────────────────────────────
 sqlalchemy==2.0.36
-pymysql==1.1.1          # MySQL driver (pure Python, no native libs needed)
-cryptography==43.0.3    # Required by PyMySQL for SSL connections
+psycopg[binary]==3.2.3
+    # Required by PyMySQL for SSL connections
 
 # ── PII detection & anonymisation ─────────────────────────────────────────────
 presidio-analyzer==2.2.356
