@@ -1,0 +1,58 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# PrivyAI Backend .gitignore
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Secrets & environment ─────────────────────────────────────────────────────
+.env
+*.env
+.env.local
+.env.*.local
+
+# ── Python bytecode ───────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+
+# ── Distribution / packaging ──────────────────────────────────────────────────
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ── Test & coverage ───────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# ── IDE / editor ──────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Temporary uploads (local dev storage adapter) ────────────────────────────
+tmp_uploads/
+
+# ── spaCy model cache ─────────────────────────────────────────────────────────
+# (Downloaded models are stored in the spaCy package directory, not here,
+#  but ignoring just in case local copies appear.)
+*.tar.gz
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+# Keep docker-compose.yml and Dockerfile tracked.
+# Ignore local override files.
+docker-compose.override.yml
