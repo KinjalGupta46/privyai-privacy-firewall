@@ -15,10 +15,12 @@ export default function AuditDashboardView() {
   const [filterAction, setFilterAction] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchTelemetry = async () => {
-    setIsLoading(true);
-    try {
-      const res = await fetch('/api/scans');
+
+const fetchTelemetry = async () => {
+  setIsLoading(true);
+  try {
+    const res = await fetch('/api/scans');
+
       if (res.ok) {
         const data = await res.json();
         setTelemetry(data);
