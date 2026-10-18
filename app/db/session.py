@@ -56,15 +56,21 @@ def _get_engine():
                 "DATABASE_URL is not configured. "
                 "Set it in .env to enable scan history."
             )
-        _engine = create_engine(
-            settings.DATABASE_URL,
-            # Connection pool settings suitable for a small backend.
-            pool_pre_ping=True,      # Detect stale connections.
-            pool_recycle=3600,       # Recycle connections after 1 hour.
-            pool_size=5,
-            max_overflow=10,
-            echo=False,              # Set True for SQL debug logging.
-        )
+        if settings.DATABASE_URL.startswith("sqlite"):
+            _engine = create_engine(
+                settings.DATABASE_URL,
+                connect_args={"check_same_thread": False},
+            )
+        else:
+            _engine = create_engine(
+                settings.DATABASE_URL,
+                # Connection pool settings suitable for a small backend.
+                pool_pre_ping=True,      # Detect stale connections.
+                pool_recycle=3600,       # Recycle connections after 1 hour.
+                pool_size=5,
+                max_overflow=10,
+                echo=False,              # Set True for SQL debug logging.
+            )
         _SessionLocal = sessionmaker(
             autocommit=False,
             autoflush=False,
@@ -128,10 +134,11 @@ def create_tables() -> None:
         python -c "from app.db.session import create_tables; create_tables()"
     """
     from app.db.base import Base
-    # Import all models so they are registered with Base.metadata
     import app.db.models.user  # noqa: F401
     import app.db.models.document  # noqa: F401
     import app.db.models.privacy_scan  # noqa: F401
+    import app.db.models.detected_entity  # noqa: F401
+    import app.db.models.audit_log  # noqa: F401
 
     eng = _get_engine()
     logger.warning(
