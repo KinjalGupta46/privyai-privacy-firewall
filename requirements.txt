@@ -34,9 +34,9 @@ httpx==0.28.1            # Async-capable, used for LLM provider calls
 
 # ── LLM provider SDKs (install only what your team chooses) ───────────────────
 # Uncomment the relevant SDK when the provider is decided:
-# openai==1.57.0
-# google-generativeai==0.8.3
-# anthropic==0.40.0
+openai>=1.57.0
+google-generativeai>=0.8.3
+anthropic>=0.40.0
 
 # ── File uploads ──────────────────────────────────────────────────────────────
 python-multipart==0.0.18  # Required by FastAPI for form/file uploads

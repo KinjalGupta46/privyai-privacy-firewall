@@ -78,13 +78,17 @@ class Settings(BaseSettings):
     OPENAI_BASE_URL: Optional[str] = None  # optional custom endpoint
 
     GEMINI_API_KEY: Optional[str] = None
-    GEMINI_MODEL: str = "gemini-1.5-flash"
+    GEMINI_MODEL: str = "gemini-2.5-flash"
 
     ANTHROPIC_API_KEY: Optional[str] = None
-    ANTHROPIC_MODEL: str = "claude-3-haiku-20240307"
+    ANTHROPIC_MODEL: str = "claude-haiku-4-5"
 
     # Timeout for LLM API calls (seconds)
     LLM_TIMEOUT: int = 30
+
+    # Max tokens in the LLM reply, and automatic retries on 429 / 5xx errors.
+    LLM_MAX_TOKENS: int = 1024
+    LLM_MAX_RETRIES: int = 2
 
     # ------------------------------------------------------------------ #
     # Privacy pipeline thresholds                                          #
