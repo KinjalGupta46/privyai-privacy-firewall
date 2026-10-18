@@ -117,8 +117,8 @@ from app.api.routes import chat  # noqa: E402
 app.include_router(health.router)
 app.include_router(chat.router, prefix="/api")
 
-# Phase 3+ routers — will be added as phases are completed.
-# from app.api.routes import documents, scans
-# app.include_router(documents.router, prefix="/api")
-# app.include_router(scans.router, prefix="/api")
+from app.api.routes import documents, scans  # noqa: E402
+
+app.include_router(documents.router, prefix="/api")
+app.include_router(scans.router, prefix="/api")
 
