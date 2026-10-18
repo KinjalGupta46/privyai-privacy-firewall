@@ -53,15 +53,15 @@ class Settings(BaseSettings):
         """Return ALLOWED_ORIGINS parsed into a Python list."""
         return [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
 
-    # ------------------------------------------------------------------ #
-    # Database (MySQL via SQLAlchemy)                                      #
-    # Leave blank to run without a database (scan history disabled).       #
+       # ------------------------------------------------------------------ #
+    # Database (PostgreSQL via SQLAlchemy)                                #
+    # Leave blank to run without a database (scan history disabled).     #
     # ------------------------------------------------------------------ #
     DATABASE_URL: Optional[str] = Field(
         default=None,
         description=(
-            "SQLAlchemy MySQL connection URL. "
-            "Example: mysql+pymysql://user:password@localhost:3306/privyai"
+            "SQLAlchemy PostgreSQL connection URL. "
+            "Example: postgresql+psycopg://user:password@localhost:5432/privyai_db"
         ),
     )
 

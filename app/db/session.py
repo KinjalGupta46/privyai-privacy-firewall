@@ -15,7 +15,7 @@ even if an exception is raised.
 
 Database configuration:
   Set DATABASE_URL in .env:
-    mysql+pymysql://user:password@localhost:3306/privyai_db
+    postgresql+psycopg://user:password@localhost:5432/privyai_db
 
   If DATABASE_URL is not set, all DB operations will raise an error.
   The application will still start — scan history just won't be persisted.
